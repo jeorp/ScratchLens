@@ -1,5 +1,5 @@
 {-# LANGUAGE RankNTypes #-}
-module Lens where
+module Lens (Lens, Lens', Getter, Getter', Setter, Setter', to) where
 
 import Data.Functor.Const
 import Data.Functor.Identity
@@ -25,7 +25,7 @@ view getter s = getConst $ getter Const s
 (^.) :: Getter a s t a b -> s -> a
 getter ^. s = view getter s
 
-to :: (s -> a) -> Getter' a s a
+to :: (s -> a) -> Getter' r s a
 to f = lens f const 
 
 over :: (a -> b) -> Setter s t a b -> s -> t
@@ -67,18 +67,4 @@ localReader :: MonadReader s m => (a -> a) -> Setter' s a -> m b -> m b
 localReader f setter = local $ over f setter
 
 
-type Traversal s t a b = forall f. Applicative f => (a -> f b) -> s -> f t
 
-traverseOf :: Applicative f => Traversal s t a b -> (a -> f b) -> s -> f t
-traverseOf = id
-
-both :: Traversal (a,a) (b,b) a b
-both f (x,y) = (,) <$> f x <*> f y
-
-traverseList :: Traversal [a] [b] a b
-traverseList _ [] = pure []
-traverseList f (x:xs) = (:) <$> f x <*> traverseList f xs
-
-
-(%~) :: Traversal s t a b -> (a -> Identity b) -> s -> t
-traversal %~ f  = runIdentity . traversal f
