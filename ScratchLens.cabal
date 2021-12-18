@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       Iso
+      IsoSpec
       Lens
       Prism
       Prism_
@@ -63,6 +64,10 @@ test-suite ScratchLens-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      LensSpec
+      PrismSpec
+      ReviewSpec
+      TraversalSpec
       Paths_ScratchLens
   hs-source-dirs:
       test

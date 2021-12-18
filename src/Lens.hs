@@ -1,5 +1,8 @@
 {-# LANGUAGE RankNTypes #-}
-module Lens (Lens, Lens', Getter, Getter', Setter, Setter', to) where
+module Lens (Lens, Lens', Getter, Getter', Setter, Setter', lens, view,
+  (^.), to, over, over', (.~), use, assign, (%=), assign', (.=), viewReader,
+  localReader 
+) where
 
 import Data.Functor.Const
 import Data.Functor.Identity
@@ -8,7 +11,7 @@ import Control.Monad.Reader
 
 type Lens s t a b = forall f. Functor f => (a -> f b) -> s -> f t
 
-type Lens' a s = Lens s s a a
+type Lens' s a = Lens s s a a
 
 lens :: (s -> a) -> (s -> b -> t) -> Lens s t a b 
 lens sa sbt afb s = fmap (sbt s) (afb $ sa s)
@@ -22,8 +25,8 @@ type Setter' s a = Setter s s a a
 view :: Getter a s t a b -> s -> a
 view getter s = getConst $ getter Const s
 
-(^.) :: Getter a s t a b -> s -> a
-getter ^. s = view getter s
+(^.) :: s -> Getter a s t a b -> a
+s ^. getter = view getter s
 
 to :: (s -> a) -> Getter' r s a
 to f = lens f const 
@@ -42,7 +45,7 @@ setter .~ b = over' b setter
 use :: MonadState s m => Getter' a s a -> m a
 use getter = do
     s <- get
-    pure $ getter ^. s
+    pure $ s ^. getter
 
 assign :: MonadState s m => (a -> a) -> Setter' s a -> m ()
 assign f setter = do
@@ -61,7 +64,7 @@ assign' a = assign (const a)
 viewReader :: MonadReader s m => Getter' a s a -> m a
 viewReader getter = do
     s <- ask
-    pure $ getter ^. s
+    pure $ s ^. getter
 
 localReader :: MonadReader s m => (a -> a) -> Setter' s a -> m b -> m b
 localReader f setter = local $ over f setter
