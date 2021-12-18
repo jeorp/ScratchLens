@@ -11,10 +11,10 @@ main = hspec spec
 data Point = Point {_x :: Int, _y :: Int} deriving (Show, Eq)
 
 x :: Lens' Point Int
-x = lens (\(Point x _) -> x) (\point b -> point{_x=b})
+x = lens (\(Point x _) -> x) (\point x -> point{_x=x})
 
 y :: Lens' Point Int
-y = lens (\(Point _ y) -> y) (\point b -> point{_y=b})
+y = lens (\(Point _ y) -> y) (\point y -> point{_y=y})
 
 
 
