@@ -1,4 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
 module LensSpec where
 
 import Test.Hspec
@@ -7,14 +6,17 @@ import Lens
 main :: IO ()
 main = hspec spec
 
-data Point = Point {_x :: Int, _y :: Int} deriving (Show, Eq)
 
+
+data Point = Point {_x :: Int, _y :: Int} deriving (Show, Eq)
 
 x :: Lens' Point Int
 x = lens (\(Point x _) -> x) (\point b -> point{_x=b})
 
 y :: Lens' Point Int
 y = lens (\(Point _ y) -> y) (\point b -> point{_y=b})
+
+
 
 data Foo = Foo {_name :: String, _point :: Point} deriving (Show, Eq)
 
@@ -24,11 +26,13 @@ name = lens (\(Foo name _) -> name) (\foo n -> foo{_name=n})
 point :: Lens' Foo Point
 point = lens (\(Foo _ point) -> point) (\foo p -> foo{_point=p})
 
+
 p :: Point
 p = Point 1 2
 
 foo :: Foo
 foo = Foo "ball" p 
+
 
 spec :: Spec
 spec = do
@@ -47,3 +51,5 @@ spec = do
 
       it "test make Lens4" $ do
         (name .~ "rect") foo `shouldBe` foo{_name="rect"}
+
+
