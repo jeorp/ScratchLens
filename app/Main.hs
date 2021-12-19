@@ -24,7 +24,7 @@ trans :: Lens' Extra Bool
 trans = lens (\(Extra _ b _) -> b) (\e b -> e {_trans=b})
 
 flash :: Lens' Extra Bool
-flash = lens (\(Extra _ _ b) -> b) (\e b -> e {_trans=b})
+flash = lens (\(Extra _ _ b) -> b) (\e b -> e {_flash=b})
 
 type Name = String
 
