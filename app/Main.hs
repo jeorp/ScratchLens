@@ -197,7 +197,7 @@ gameEnd = do
         continueRename "n" = do
           name_ <- use (player . name)
           put initWorld
-          (player . playerName) .= name_
+          (player . name) .= name_
           gameStart >> gameLoop
           
         continueRename "y" = do
