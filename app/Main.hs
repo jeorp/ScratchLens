@@ -7,7 +7,12 @@ import Control.Monad.State
 
 -- example program 
 
-data Point = Point {_x :: Int, _y :: Int}
+data Point = 
+  Point 
+  {
+    _x :: Int, 
+    _y :: Int
+  } deriving (Show, Eq)
 
 x :: Lens' Point Int
 x = lens (\(Point x _) -> x) (\p x -> p {_x=x})
@@ -15,7 +20,13 @@ x = lens (\(Point x _) -> x) (\p x -> p {_x=x})
 y :: Lens' Point Int
 y = lens (\(Point _ y) -> y) (\p y -> p {_y=y})
 
-data Extra = Extra {_moveTwo :: Bool, _trans :: Bool, _flash :: Bool}
+data Extra = 
+  Extra 
+  {
+    _moveTwo :: Bool, 
+    _trans :: Bool, 
+    _flash :: Bool
+  } deriving (Show, Eq)
 
 moveTwo :: Lens' Extra Bool
 moveTwo = lens (\(Extra b _ _) -> b) (\e b -> e {_moveTwo=b})
@@ -34,7 +45,7 @@ data Player =
     _playerName :: Name, 
     _playerPoint :: Point,
     _extra :: Extra
-  }
+  } deriving (Show, Eq)
 
 playerName :: Lens' Player Name
 playerName = lens (\(Player n _ _) -> n) (\obj n -> obj {_playerName=n})
@@ -50,8 +61,9 @@ data Enemy =
   {
     _enemyName :: Name, 
     _enemyPoint :: Point, 
-    _remain :: Int, _goal :: Bool
-  }
+    _dis :: Int,
+    _goal :: Bool
+  } deriving (Show, Eq)
 
 enemyName :: Lens' Enemy String
 enemyName = lens (\(Enemy n _ _ _) -> n) (\e n -> e {_enemyName = n})
@@ -59,8 +71,8 @@ enemyName = lens (\(Enemy n _ _ _) -> n) (\e n -> e {_enemyName = n})
 enemyPoint :: Lens' Enemy Point
 enemyPoint = lens (\(Enemy _ p _ _) -> p) (\e p -> e {_enemyPoint = p})
 
-remain :: Lens' Enemy Int
-remain = lens (\(Enemy _ _ r _) -> r) (\e r -> e {_remain = r})
+dis :: Lens' Enemy Int
+dis = lens (\(Enemy _ _ r _) -> r) (\e r -> e {_dis = r})
 
 goal :: Lens' Enemy Bool
 goal = lens (\(Enemy _ _ _ g) -> g) (\e g -> e {_goal = g})
@@ -97,6 +109,8 @@ instance HasName Enemy where
 type Game = StateT World IO
 
 type Size = Int
+
+data Direction = RIGHT | LEFT | UP | DOWN
 
 size :: Size
 size = 5
@@ -153,7 +167,20 @@ gameLoop = do
           then gameEnd 
           else do
             t <- use turn
-            liftIO $ putStrLn $ "  __ Turn is " <> show t <> " __  "
+            distance <- use (enemy . dis)
+            playerPos <- use (player . pos)
+            mapM_ (liftIO . putStrLn) 
+              [
+                "  __ Turn is " <> show t <> " __  ",
+                "",
+                "",
+                "Enemy is " <> show distance <> " seperated from " <> "(" <> show (playerPos ^. x) <> "," <> show (playerPos ^. y) <> ")"
+              
+              ]
+            where
+              executable :: Point -> [Direction]
+              executable p = []
+            
 
 gameEnd :: Game ()
 gameEnd = do
