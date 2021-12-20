@@ -1,6 +1,9 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE  RankNTypes #-}
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleInstances #-}
 
 module Main where
@@ -10,7 +13,7 @@ import Lens -- import from src/Lens.hs
 import Control.Monad.State
 
 import Data.List
-
+import Data.Monoid
 import Data.Proxy
 import GHC.TypeLits
 
@@ -146,6 +149,18 @@ type Size = Int
 
 data Direction = RIGHT | LEFT | UP | DOWN deriving (Eq, Show)
 
+right :: Lens' Direction Direction 
+right = lens id (const (const RIGHT))
+
+left :: Lens' Direction Direction 
+left = lens id (const (const LEFT))
+
+down :: Lens' Direction Direction 
+down = lens id (const (const DOWN))
+
+up :: Lens' Direction Direction 
+up = lens id (const (const UP))
+
 executable :: Point -> [Direction]
 executable p = 
   let xs = []
@@ -157,6 +172,12 @@ executable p =
 
 data Answer = Yes | No deriving (Eq, Show)
 
+yes :: Lens' Answer Answer 
+yes = lens id (const (const Yes))
+
+no :: Lens' Answer Answer 
+no = lens id (const (const No))
+
 class Registered l where
   command :: Proxy l -> String
 
@@ -166,17 +187,129 @@ instance Registered "y" where
 instance Registered "n" where
   command _ = "n"
 
-data Command = forall l. Registered l => Command {getCommand :: Maybe (Proxy l)}
+instance Registered "l" where
+  command _ = "l"
 
-class CommandObj c where
-  toCommand :: c -> Command
-  fromCommand :: Command -> Maybe c
+instance Registered "r" where
+  command _ = "r"
 
-instance CommandObj Answer where
-  toCommand Yes = Command (Just (Proxy :: Proxy "y"))
-  toCommand No = Command (Just (Proxy :: Proxy "n"))
+instance Registered "d" where
+  command _ = "d"
+
+instance Registered "u" where
+  command _ = "u"
+
+instance Registered "w" where
+  command _ = "w"
+
+instance Registered "t" where
+  command _ = "t"
+
+instance Registered "f" where
+  command _ = "f"
+
+-- deprecated ------------------------------------------------------
+
+--data Command a = forall l. Registered l => Relate a (Proxy l)
+
+{-
+
+lookupRegistered :: Eq c => [Command c] -> c -> Maybe String
+lookupRegistered [] _ = Nothing
+lookupRegistered ((Relate x p):xs) c = if x == c then Just (command p) else lookupRegistered xs c
+
+lookupFromRegistered :: [Command c] -> String -> Maybe c
+lookupFromRegistered [] _ = Nothing
+lookupFromRegistered ((Relate x p):xs) s = if command p == s then Just x else lookupFromRegistered xs s -}
+
+{-toCommand :: forall c. (Eq c, CommandObj c) => c -> Maybe String
+toCommand = lookupRegistered symbols
+fromCommand :: forall c. CommandObj c => String -> Maybe c
+fromCommand = lookupFromRegistered symbols 
+
+-}
+
+-----------------------------------------------------------------------
 
 
+data Command' s a = forall l. Registered l => Relate (Lens' s a) (Proxy l)
+
+lookupRegisteredSS :: Eq s => [Command' s s] -> s -> Last String
+lookupRegisteredSS = lookup_
+  where
+    lookup_ :: Eq s => [Command' s s] -> s -> Last String
+    lookup_ [] _ = Last Nothing
+    lookup_ ((Relate l p) : xs) ans = if ans ^. l == ans then Last (Just $ command p) else lookup_ xs ans
+
+lookupFromRegisteredSS :: [Command' s s] -> String -> s -> Last s
+lookupFromRegisteredSS = lookup_
+  where
+    lookup_ :: [Command' s s] -> String -> s -> Last s
+    lookup_ [] _ _ = Last Nothing
+    lookup_ ((Relate l p) : xs) s ans = if command p == s then Last (Just $ ans ^. l) else lookup_ xs s ans
+
+lookupRegisteredSB :: Eq s => [Command' s Bool] -> s -> Last String
+lookupRegisteredSB = lookup_
+  where
+    lookup_ :: Eq s => [Command' s Bool] -> s -> Last String
+    lookup_ [] _ = Last Nothing
+    lookup_ ((Relate l p) : xs) ans = if ans ^. l then Last (Just $ command p) else lookup_ xs ans
+
+lookupFromRegisteredSB :: [Command' s Bool] -> String -> s -> Last Bool
+lookupFromRegisteredSB = lookup_
+  where
+    lookup_ :: [Command' s Bool] -> String -> s -> Last Bool
+    lookup_ [] _ _ = Last Nothing
+    lookup_ ((Relate l p) : xs) s ans = if command p == s then Last (Just $ ans ^. l) else lookup_ xs s ans
+
+
+class CommandObj s a | s -> a where
+  symbols :: [Command' s a]
+  lookupRegistered :: s -> Last String
+  lookupFromRegistered :: String -> s -> Last a
+
+
+instance CommandObj Answer Answer where
+  symbols = 
+    [
+      Relate yes (Proxy :: Proxy "y"), 
+      Relate no (Proxy :: Proxy "n")
+    ]
+    
+  lookupRegistered = lookupRegisteredSS symbols
+  lookupFromRegistered = lookupFromRegisteredSS symbols
+
+
+instance CommandObj Direction Direction where
+  symbols = 
+    [
+      Relate left (Proxy :: Proxy "l"),
+      Relate right (Proxy :: Proxy "r"),
+      Relate down (Proxy :: Proxy "d"),
+      Relate up (Proxy :: Proxy "u")
+    ]
+
+  lookupRegistered = lookupRegisteredSS symbols
+  lookupFromRegistered = lookupFromRegisteredSS symbols
+
+instance CommandObj Extra Bool where
+  symbols = 
+    [
+      Relate moveTwo (Proxy :: Proxy "w"),
+      Relate trans (Proxy :: Proxy "t"),
+      Relate flash (Proxy :: Proxy "f")
+    ]
+  
+  lookupRegistered = lookupRegisteredSB symbols
+  lookupFromRegistered = lookupFromRegisteredSB symbols
+
+
+class Description d where
+  descript :: d -> String
+
+
+
+{-
 class Description d where
   descript :: d -> String
 
@@ -187,7 +320,7 @@ instance Description Extra where
 
 instance Description [Direction] where
   descript d = "Move (command) : " <> intercalate " or " (fmap show d)
-
+-}
 
 size :: Size
 size = 5
