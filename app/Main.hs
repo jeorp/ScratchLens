@@ -56,16 +56,29 @@ playerPoint = lens (\(Player _ p _) -> p) (\obj p -> obj {_playerPoint=p})
 extra :: Lens' Player Extra
 extra = lens (\(Player _ _ e) -> e) (\obj e -> obj {_extra=e})
 
+data Dictionary = 
+  Dictionary 
+  {
+    _word :: Name,
+    _meaning :: String
+  } deriving (Show, Eq)
+
+word :: Lens' Dictionary Name
+word = lens (\(Dictionary w _) -> w) (\d w -> d {_word=w})
+
+meanig :: Lens' Dictionary String
+meanig = lens (\(Dictionary _ m) -> m) (\d m -> d {_meaning=m})
+
 data Enemy = 
   Enemy 
   {
-    _enemyName :: Name, 
+    _enemyName :: Dictionary, 
     _enemyPoint :: Point, 
     _dis :: Int,
     _goal :: Bool
   } deriving (Show, Eq)
 
-enemyName :: Lens' Enemy String
+enemyName :: Lens' Enemy Dictionary
 enemyName = lens (\(Enemy n _ _ _) -> n) (\e n -> e {_enemyName = n})
 
 enemyPoint :: Lens' Enemy Point
@@ -114,7 +127,7 @@ instance HasName Player where
   name = playerName
 
 instance HasName Enemy where
-  name = enemyName
+  name = enemyName . word
 
 type Game = StateT World IO
 
@@ -146,8 +159,11 @@ initPlayerExtra = Extra True True True
 initPlayer :: Player
 initPlayer = Player "" initPlayerPos initPlayerExtra
 
-randomEnemyName :: Name
-randomEnemyName = ""
+dictionaryPath :: String
+dictionaryPath = "gene-utf8.txt" -- set dictionary file path. 
+
+randomEnemyName :: Dictionary
+randomEnemyName = Dictionary "" ""
 
 initEnemy :: Enemy
 initEnemy = Enemy randomEnemyName initEnemyPos (size*2) False
