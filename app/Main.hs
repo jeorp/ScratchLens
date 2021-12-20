@@ -112,7 +112,7 @@ data World =
     _warpPoint :: Point, 
     _player :: Player, 
     _enemy :: Enemy
-  }
+  } deriving (Show, Eq)
 
 turn :: Lens' World Int
 turn = lens (\(World t _ _ _) -> t) (\w t -> w {_turn=t})
@@ -221,9 +221,9 @@ lookupRegistered ((Relate x p):xs) c = if x == c then Just (command p) else look
 
 lookupFromRegistered :: [Command c] -> String -> Maybe c
 lookupFromRegistered [] _ = Nothing
-lookupFromRegistered ((Relate x p):xs) s = if command p == s then Just x else lookupFromRegistered xs s -}
+lookupFromRegistered ((Relate x p):xs) s = if command p == s then Just x else lookupFromRegistered xs s
 
-{-toCommand :: forall c. (Eq c, CommandObj c) => c -> Maybe String
+toCommand :: forall c. (Eq c, CommandObj c) => c -> Maybe String
 toCommand = lookupRegistered symbols
 fromCommand :: forall c. CommandObj c => String -> Maybe c
 fromCommand = lookupFromRegistered symbols 
