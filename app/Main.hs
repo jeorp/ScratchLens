@@ -183,15 +183,22 @@ gameStart = do
 
 playerAction :: Game ()
 playerAction = do
-  pure ()
+  return ()
 
 enemyAction :: Game ()
 enemyAction = do
-  pure ()
+  return ()
 
 updateWorld :: Game ()
 updateWorld = do
-  pure ()
+  isFinish <- use (enemy . goal)
+  if isFinish 
+    then gameEnd
+    else do
+      t <- use turn
+      liftIO $ putStrLn $ show t <> " trun is over. Next,"
+      turn %= (+1)
+      warpPoint .= randomPoint
 
 gameLoop :: Game ()
 gameLoop = do
