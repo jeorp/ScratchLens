@@ -155,6 +155,20 @@ executable p =
       addUp = if p ^. y < size then UP : addDown else addDown
       in addUp
 
+data Answer = Yes | No deriving (Eq, Show)
+
+newtype Command = Command {getCommand :: Maybe String} deriving Eq
+
+instance Show Command where
+  show (Command Nothing) = ""
+  show (Command (Just c)) = "(" <> c <> ")"
+
+class HasCommand c where
+  toCommand :: c -> Command
+  fromCommand :: Command -> c -- toCommand . fromCommand = id /\ fromaCommand . toCommand = id
+
+
+
 class Description d where
   descript :: d -> String
 
@@ -165,6 +179,7 @@ instance Description Extra where
 
 instance Description [Direction] where
   descript d = "Move (command) : " <> intercalate " or " (fmap show d)
+
 
 size :: Size
 size = 5
@@ -237,8 +252,13 @@ playerAction = do
           ] :: Game ()
       
       action = do
-        command <- liftIO getLine
+        input <- liftIO getLine
+        playerAction input
         return () :: Game ()
+          where
+            playerAction :: String -> Game ()
+            playerAction s = do 
+              void $ return ex
       
       in description >> action
 
