@@ -161,7 +161,7 @@ class Description d where
 instance Description Extra where
   descript ex = 
     let xs = [(ex ^. moveTwo, "Move Two Step! (w)"), (ex ^. trans, "Transporte! (t)"), (ex ^. flash, "Flash! (f)")]
-        in "Extra (command) : " <> intercalate "or" (show . snd <$> filter fst xs)
+        in "Extra (command) : " <> intercalate " or " (show . snd <$> filter fst xs)
 
 instance Description [Direction] where
   descript d = "Move (command) : " <> intercalate " or " (fmap show d)
@@ -221,26 +221,27 @@ gameStart = do
 
 playerAction :: Game ()
 playerAction = do
-  description
-  action
-  return ()
-  where
-    description :: Game ()
-    description = do
-      playerPos <- use (player . pos)
-      ex <- use (player . extra)
-      let directions = executable playerPos
-      mapM_ (liftIO . putStrLn) 
-        [
-          "",
-          "Now, you are " <> show (playerPos ^. x, playerPos ^. y) <> " .",
-          "Your commnad is " <> descript directions,
-          "Or extra.",
-          descript ex
-        ]
-    action :: Game ()
-    action = do
-      return ()
+  playerPos <- use (player . pos)
+  ex <- use (player . extra)
+  let directions = executable playerPos
+      
+      description = do
+        mapM_ (liftIO . putStrLn) 
+          [
+            "",
+            "Now, you are " <> show (playerPos ^. x, playerPos ^. y) <> " .",
+            "Your commnad is ",
+            descript directions,
+            "Or,", 
+            descript ex
+          ] :: Game ()
+      
+      action = do
+        command <- liftIO getLine
+        return () :: Game ()
+      
+      in description >> action
+
 
 enemyAction :: Game ()
 enemyAction = do
