@@ -5,6 +5,7 @@
 {-# LANGUAGE  RankNTypes #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Main where
 
@@ -182,31 +183,31 @@ class Registered l where
   command :: Proxy l -> String
 
 instance Registered "y" where
-  command _ = "y"
+  command _ = "(y)"
 
 instance Registered "n" where
-  command _ = "n"
+  command _ = "(n)"
 
 instance Registered "l" where
-  command _ = "l"
+  command _ = "(l)"
 
 instance Registered "r" where
-  command _ = "r"
+  command _ = "(r)"
 
 instance Registered "d" where
-  command _ = "d"
+  command _ = "(d)"
 
 instance Registered "u" where
-  command _ = "u"
+  command _ = "(u)"
 
 instance Registered "w" where
-  command _ = "w"
+  command _ = "(w)"
 
 instance Registered "t" where
-  command _ = "t"
+  command _ = "(t)"
 
 instance Registered "f" where
-  command _ = "f"
+  command _ = "(f)"
 
 -- deprecated ------------------------------------------------------
 
@@ -232,35 +233,35 @@ fromCommand = lookupFromRegistered symbols
 -----------------------------------------------------------------------
 
 
-data Command' s a = forall l. Registered l => Relate (Lens' s a) (Proxy l)
+data Command' s a = forall l. (KnownSymbol l, Registered l) => Relate (Lens' s a) (Proxy l)
 
 lookupRegisteredSS :: Eq s => [Command' s s] -> s -> Last String
 lookupRegisteredSS = lookup_
   where
     lookup_ :: Eq s => [Command' s s] -> s -> Last String
     lookup_ [] _ = Last Nothing
-    lookup_ ((Relate l p) : xs) ans = if ans ^. l == ans then Last (Just $ command p) else lookup_ xs ans
+    lookup_ ((Relate l p) : xs) ans = if ans ^. l == ans then Last (Just $ symbolVal p) else lookup_ xs ans
 
 lookupFromRegisteredSS :: [Command' s s] -> String -> s -> Last s
 lookupFromRegisteredSS = lookup_
   where
     lookup_ :: [Command' s s] -> String -> s -> Last s
     lookup_ [] _ _ = Last Nothing
-    lookup_ ((Relate l p) : xs) s ans = if command p == s then Last (Just $ ans ^. l) else lookup_ xs s ans
+    lookup_ ((Relate l p) : xs) s ans = if symbolVal p == s then Last (Just $ ans ^. l) else lookup_ xs s ans
 
 lookupRegisteredSB :: Eq s => [Command' s Bool] -> s -> Last String
 lookupRegisteredSB = lookup_
   where
     lookup_ :: Eq s => [Command' s Bool] -> s -> Last String
     lookup_ [] _ = Last Nothing
-    lookup_ ((Relate l p) : xs) ans = if ans ^. l then Last (Just $ command p) else lookup_ xs ans
+    lookup_ ((Relate l p) : xs) ans = if ans ^. l then Last (Just $ symbolVal p) else lookup_ xs ans
 
 lookupFromRegisteredSB :: [Command' s Bool] -> String -> s -> Last Bool
 lookupFromRegisteredSB = lookup_
   where
     lookup_ :: [Command' s Bool] -> String -> s -> Last Bool
     lookup_ [] _ _ = Last Nothing
-    lookup_ ((Relate l p) : xs) s ans = if command p == s then Last (Just $ ans ^. l) else lookup_ xs s ans
+    lookup_ ((Relate l p) : xs) s ans = if symbolVal p == s then Last (Just $ ans ^. l) else lookup_ xs s ans
 
 
 class CommandObj s a | s -> a where
@@ -303,18 +304,34 @@ instance CommandObj Extra Bool where
   lookupRegistered = lookupRegisteredSB symbols
   lookupFromRegistered = lookupFromRegisteredSB symbols
 
+data Descriptor s = 
+  Descriptor 
+  {
+    _tag :: String,
+    _elem :: [s] 
+  } deriving Eq
+
+tag :: Lens' (Descriptor s) String
+tag = lens (\(Descriptor t _) -> t) (\d t -> d {_tag=t})
+
+elem :: Lens' (Descriptor s) [s]
+elem = lens (\(Descriptor _ e) -> e) (\d e -> d {_elem=e})
+
+instance (CommandObj s a) => Show (Descriptor s) where
+  show d = ""
+
 
 class Description d where
-  descript :: d -> String
+  descript :: Descriptor d 
 
 instance Description Answer where
-  descript ans = ""
+  descript = undefined 
 
 instance Description Direction where
-  descript dir = ""
+  descript = undefined
 
 instance Description Extra where
-  descript ex = ""
+  descript = undefined 
 
 {-
 class Description d where
