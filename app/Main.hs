@@ -77,16 +77,26 @@ dis = lens (\(Enemy _ _ r _) -> r) (\e r -> e {_dis = r})
 goal :: Lens' Enemy Bool
 goal = lens (\(Enemy _ _ _ g) -> g) (\e g -> e {_goal = g})
 
-data World = World {_turn :: Int, _player :: Player, _enemy :: Enemy}
+data World = 
+  World 
+  {
+    _turn :: Int,
+    _warpPoint :: Point, 
+    _player :: Player, 
+    _enemy :: Enemy
+  }
 
 turn :: Lens' World Int
-turn = lens (\(World t _ _) -> t) (\w t -> w {_turn=t})
+turn = lens (\(World t _ _ _) -> t) (\w t -> w {_turn=t})
+
+warpPoint :: Lens' World Point
+warpPoint = lens (\(World _ p _ _) -> p) (\w p -> w {_warpPoint=p})
 
 player :: Lens' World Player
-player = lens (\(World _ p _) -> p) (\w p -> w {_player=p})
+player = lens (\(World _ _ p _) -> p) (\w p -> w {_player=p})
 
 enemy :: Lens' World Enemy
-enemy = lens (\(World _ _ e) -> e) (\w e -> w {_enemy=e})
+enemy = lens (\(World _ _ _ e) -> e) (\w e -> w {_enemy=e})
 
 class HasPoint c where
   pos :: Lens' c  Point
@@ -112,6 +122,15 @@ type Size = Int
 
 data Direction = RIGHT | LEFT | UP | DOWN
 
+executable :: Point -> [Direction]
+executable p = 
+  let xs = []
+      addLeft = if p ^. x > 0 then LEFT : xs else xs
+      addRight = if p ^. x < size then RIGHT : addLeft else addLeft
+      addDown = if p ^. y > 0 then DOWN : addRight else addRight
+      addUp = if p ^. y < size then UP : addDown else addDown
+      in addUp
+
 size :: Size
 size = 5
 
@@ -127,11 +146,17 @@ initPlayerExtra = Extra True True True
 initPlayer :: Player
 initPlayer = Player "" initPlayerPos initPlayerExtra
 
+randomEnemyName :: Name
+randomEnemyName = ""
+
 initEnemy :: Enemy
-initEnemy = Enemy "" initEnemyPos (size*2) False
+initEnemy = Enemy randomEnemyName initEnemyPos (size*2) False
+
+randomPoint :: Point
+randomPoint = Point 0 0
 
 initWorld :: World
-initWorld = World 0 initPlayer initEnemy
+initWorld = World 0 randomPoint initPlayer initEnemy
 
 gameInit :: Game ()
 gameInit = do
@@ -156,31 +181,40 @@ gameStart = do
       ""
     ]
 
+playerAction :: Game ()
+playerAction = do
+  pure ()
+
+enemyAction :: Game ()
+enemyAction = do
+  pure ()
+
+updateWorld :: Game ()
+updateWorld = do
+  pure ()
+
 gameLoop :: Game ()
 gameLoop = do
   loop
   where
     loop :: Game ()
     loop = do
-      isFinish <- use (enemy . goal)
-      if isFinish 
-          then gameEnd 
-          else do
-            t <- use turn
-            distance <- use (enemy . dis)
-            playerPos <- use (player . pos)
-            mapM_ (liftIO . putStrLn) 
-              [
-                "  __ Turn is " <> show t <> " __  ",
-                "",
-                "",
-                "Enemy is " <> show distance <> " seperated from " <> "(" <> show (playerPos ^. x) <> "," <> show (playerPos ^. y) <> ")"
+      t <- use turn
+      distance <- use (enemy . dis)
+      playerPos <- use (player . pos)
+      mapM_ (liftIO . putStrLn) 
+        [
+          "  __ Turn is " <> show t <> " __  ",
+          "",
+          "",
+          "Enemy is " <> show distance <> " seperated from " <> "(" <> show (playerPos ^. x) <> "," <> show (playerPos ^. y) <> ")"
               
-              ]
-            where
-              executable :: Point -> [Direction]
-              executable p = []
-            
+        ]
+      playerAction
+      enemyAction
+      updateWorld
+      loop
+
 
 gameEnd :: Game ()
 gameEnd = do
