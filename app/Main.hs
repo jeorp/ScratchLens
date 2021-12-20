@@ -307,7 +307,14 @@ instance CommandObj Extra Bool where
 class Description d where
   descript :: d -> String
 
+instance Description Answer where
+  descript ans = ""
 
+instance Description Direction where
+  descript dir = ""
+
+instance Description Extra where
+  descript ex = ""
 
 {-
 class Description d where
