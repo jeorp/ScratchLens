@@ -1,8 +1,13 @@
+{-# LANGUAGE FlexibleInstances #-}
+
 module Main where
 
 import Lens -- import from src/Lens.hs
 
 import Control.Monad.State
+
+import Data.List 
+
 
 
 -- example program 
@@ -133,7 +138,13 @@ type Game = StateT World IO
 
 type Size = Int
 
-data Direction = RIGHT | LEFT | UP | DOWN
+data Direction = RIGHT | LEFT | UP | DOWN deriving Eq
+
+instance Show Direction where
+  show RIGHT = "Right (r)"
+  show LEFT = "Left (l)"
+  show UP = "Up (u)"
+  show DOWN = "Down (d)"
 
 executable :: Point -> [Direction]
 executable p = 
@@ -143,6 +154,17 @@ executable p =
       addDown = if p ^. y > 0 then DOWN : addRight else addRight
       addUp = if p ^. y < size then UP : addDown else addDown
       in addUp
+
+class Description d where
+  descript :: d -> String
+
+instance Description Extra where
+  descript ex = 
+    let xs = [(ex ^. moveTwo, "Move Two Step! (w)"), (ex ^. trans, "Transporte! (t)"), (ex ^. flash, "Flash! (f)")]
+        in "Extra (command) : " <> intercalate "or" (show . snd <$> filter fst xs)
+
+instance Description [Direction] where
+  descript d = "Move (command) : " <> intercalate " or " (fmap show d)
 
 size :: Size
 size = 5
@@ -199,7 +221,26 @@ gameStart = do
 
 playerAction :: Game ()
 playerAction = do
+  description
+  action
   return ()
+  where
+    description :: Game ()
+    description = do
+      playerPos <- use (player . pos)
+      ex <- use (player . extra)
+      let directions = executable playerPos
+      mapM_ (liftIO . putStrLn) 
+        [
+          "",
+          "Now, you are " <> show (playerPos ^. x, playerPos ^. y) <> " .",
+          "Your commnad is " <> descript directions,
+          "Or extra.",
+          descript ex
+        ]
+    action :: Game ()
+    action = do
+      return ()
 
 enemyAction :: Game ()
 enemyAction = do
