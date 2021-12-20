@@ -1,3 +1,6 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 
 module Main where
@@ -6,7 +9,10 @@ import Lens -- import from src/Lens.hs
 
 import Control.Monad.State
 
-import Data.List 
+import Data.List
+
+import Data.Proxy
+import GHC.TypeLits
 
 
 
@@ -138,13 +144,7 @@ type Game = StateT World IO
 
 type Size = Int
 
-data Direction = RIGHT | LEFT | UP | DOWN deriving Eq
-
-instance Show Direction where
-  show RIGHT = "Right (r)"
-  show LEFT = "Left (l)"
-  show UP = "Up (u)"
-  show DOWN = "Down (d)"
+data Direction = RIGHT | LEFT | UP | DOWN deriving (Eq, Show)
 
 executable :: Point -> [Direction]
 executable p = 
@@ -157,16 +157,24 @@ executable p =
 
 data Answer = Yes | No deriving (Eq, Show)
 
-newtype Command = Command {getCommand :: Maybe String} deriving Eq
+class Registered l where
+  command :: Proxy l -> String
 
-instance Show Command where
-  show (Command Nothing) = ""
-  show (Command (Just c)) = "(" <> c <> ")"
+instance Registered "y" where
+  command _ = "y"
 
-class HasCommand c where
+instance Registered "n" where
+  command _ = "n"
+
+data Command = forall l. Registered l => Command {getCommand :: Maybe (Proxy l)}
+
+class CommandObj c where
   toCommand :: c -> Command
-  fromCommand :: Command -> c -- toCommand . fromCommand = id /\ fromaCommand . toCommand = id
+  fromCommand :: Command -> Maybe c
 
+instance CommandObj Answer where
+  toCommand Yes = Command (Just (Proxy :: Proxy "y"))
+  toCommand No = Command (Just (Proxy :: Proxy "n"))
 
 
 class Description d where
