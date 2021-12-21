@@ -237,12 +237,12 @@ fromCommand = lookupFromRegistered symbols
 
 data Command' s a = forall l. (KnownSymbol l, Registered l) => Relate (Lens' s a) (Proxy l)
 
-lookupRegisteredSS :: Eq s => [Command' s s] -> s -> Last (String, String)
+lookupRegisteredSS :: Eq s => [Command' s s] -> s -> Last [(String, String)]
 lookupRegisteredSS = lookup_
   where
-    lookup_ :: Eq s => [Command' s s] -> s -> Last (String, String)
+    lookup_ :: Eq s => [Command' s s] -> s -> Last [(String, String)]
     lookup_ [] _ = Last Nothing
-    lookup_ ((Relate l p) : xs) ans = if ans ^. l == ans then Last (Just $ (symbolVal &&& command) p) else lookup_ xs ans
+    lookup_ ((Relate l p) : xs) ans = if ans ^. l == ans then Last (Just [(symbolVal &&& command) p]) else lookup_ xs ans
 
 lookupFromRegisteredSS :: [Command' s s] -> String -> s -> Last s
 lookupFromRegisteredSS = lookup_
@@ -251,12 +251,15 @@ lookupFromRegisteredSS = lookup_
     lookup_ [] _ _ = Last Nothing
     lookup_ ((Relate l p) : xs) s ans = if symbolVal p == s then Last (Just $ ans ^. l) else lookup_ xs s ans
 
-lookupRegisteredSB :: Eq s => [Command' s Bool] -> s -> Last (String, String)
-lookupRegisteredSB = lookup_
+lookupRegisteredSB :: Eq s => [Command' s Bool] -> s -> Last [(String, String)]
+lookupRegisteredSB = lookup_ []
   where
-    lookup_ :: Eq s => [Command' s Bool] -> s -> Last (String, String)
-    lookup_ [] _ = Last Nothing
-    lookup_ ((Relate l p) : xs) ans = if ans ^. l then Last (Just $ (symbolVal &&& command) p) else lookup_ xs ans
+    lookup_ :: Eq s => [(String, String)] -> [Command' s Bool] -> s -> Last [(String, String)]
+    lookup_ [] _ _ = Last Nothing
+    lookup_ a [] _ = Last $ Just a
+    lookup_ a ((Relate l p) : xs) ans = if ans ^. l 
+      then lookup_ ((symbolVal &&& command) p : a) xs ans
+      else lookup_ a xs ans
 
 lookupFromRegisteredSB :: [Command' s Bool] -> String -> s -> Last Bool
 lookupFromRegisteredSB = lookup_
@@ -268,7 +271,7 @@ lookupFromRegisteredSB = lookup_
 
 class CommandObj s a | s -> a where
   symbols :: [Command' s a]
-  lookupRegistered :: s -> Last (String, String)
+  lookupRegistered :: s -> Last [(String, String)]
   lookupFromRegistered :: String -> s -> Last a
 
 
@@ -322,35 +325,27 @@ elem = lens (\(Descriptor _ e) -> e) (\d e -> d {_elem=e})
 instance (CommandObj s a) => Show (Descriptor [s]) where
   show (Descriptor t xs) = t <> enum xs  
     where
-      enum xs = intercalate " or " (uncurry (<>) . (fromMaybe ("", "") . getLast . lookupRegistered) <$> xs) 
+      enum xs = intercalate " or " (uncurry (<>) . (maybe ("", "") head . getLast . lookupRegistered) <$> xs) 
 
 instance Show (Descriptor Extra) where
-  show (Descriptor t ex) = ""
+  show (Descriptor t ex) = t <> enum ex
+    where 
+      enum ex = intercalate " or " $ uncurry (<>) <$> (fromMaybe [] . getLast . lookupRegistered) ex
 
 class Description d where
   descript :: d -> Descriptor d 
 
 instance Description [Answer] where
-  descript = undefined 
+  descript = Descriptor "Answer : " 
 
 instance Description [Direction] where
-  descript = undefined
+  descript = Descriptor "Direction : "
 
 instance Description Extra where
-  descript = undefined 
+  descript = Descriptor "Extra : "
 
-{-
-class Description d where
-  descript :: d -> String
-
-instance Description Extra where
-  descript ex = 
-    let xs = [(ex ^. moveTwo, "Move Two Step! (w)"), (ex ^. trans, "Transporte! (t)"), (ex ^. flash, "Flash! (f)")]
-        in "Extra (command) : " <> intercalate " or " (show . snd <$> filter fst xs)
-
-instance Description [Direction] where
-  descript d = "Move (command) : " <> intercalate " or " (fmap show d)
--}
+printBoard :: Point -> Int -> IO () 
+printBoard p d = undefined
 
 size :: Size
 size = 5
@@ -417,9 +412,9 @@ playerAction = do
             "",
             "Now, you are " <> show (playerPos ^. x, playerPos ^. y) <> " .",
             "Your commnad is ",
-            descript directions,
+            show $ descript directions,
             "Or,", 
-            descript ex
+            show $ descript ex
           ] :: Game ()
       
       action = do
