@@ -24,6 +24,7 @@ dependencies:
 - mtl
 - profunctors
 - tagged
+- random
 - hspec
 
 library:

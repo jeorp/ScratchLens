@@ -17,6 +17,8 @@ import Data.List
 import Data.Maybe
 import Data.Monoid
 import Control.Arrow
+
+import System.Random
 import Data.Proxy
 import GHC.TypeLits
 
@@ -150,7 +152,7 @@ type Game = StateT World IO
 
 type Size = Int
 
-data Direction = RIGHT | LEFT | UP | DOWN deriving (Eq, Show)
+data Direction = RIGHT | LEFT | UP | DOWN deriving (Eq, Ord, Enum, Show, Bounded)
 
 right_ :: Lens' Direction Direction 
 right_ = lens id (const (const RIGHT))
@@ -173,13 +175,24 @@ executable p =
       addUp = if p ^. y < size then UP : addDown else addDown
       in addUp
 
-data Answer = Yes | No deriving (Eq, Show)
+data Answer = Yes | No deriving (Eq, Ord, Enum, Show, Bounded)
 
 yes_ :: Lens' Answer Answer 
 yes_ = lens id (const (const Yes))
 
 no_ :: Lens' Answer Answer 
 no_ = lens id (const (const No))
+
+data RPS = Rock | Paper | Scissors deriving (Eq, Ord, Enum, Show, Bounded)
+
+rock_ :: Lens' RPS RPS 
+rock_ = lens id (const (const Rock))
+
+paper_ :: Lens' RPS RPS 
+paper_ = lens id (const (const Paper))
+
+scissors_ :: Lens' RPS RPS 
+scissors_ = lens id (const (const Scissors))
 
 class Registered l where
   command :: Proxy l -> String
@@ -210,6 +223,15 @@ instance Registered "t" where
 
 instance Registered "f" where
   command _ = "Flash"
+
+instance Registered "rock" where
+  command _ = "Rock"
+
+instance Registered "paper" where
+  command _ = "Paper"
+
+instance Registered "scissors" where
+  command _ = "Scissors"
 
 -- deprecated ------------------------------------------------------
 
@@ -286,6 +308,18 @@ instance CommandObj Answer Answer where
   lookupFromRegistered = lookupFromRegisteredSS symbols
 
 
+instance CommandObj RPS RPS where
+  symbols = 
+    [
+      Relate rock_ (Proxy :: Proxy "rock"), 
+      Relate paper_ (Proxy :: Proxy "paper"),
+      Relate scissors_ (Proxy :: Proxy "scissors")
+    ]
+    
+  lookupRegistered = lookupRegisteredSS symbols
+  lookupFromRegistered = lookupFromRegisteredSS symbols
+
+
 instance CommandObj Direction Direction where
   symbols = 
     [
@@ -297,6 +331,7 @@ instance CommandObj Direction Direction where
 
   lookupRegistered = lookupRegisteredSS symbols
   lookupFromRegistered = lookupFromRegisteredSS symbols
+
 
 instance CommandObj Extra Bool where
   symbols = 
@@ -373,6 +408,12 @@ initEnemy = Enemy randomEnemyName initEnemyPos (size*2) False
 
 randomPoint :: Point
 randomPoint = Point 0 0
+
+randomIOPoint :: IO Point
+randomIOPoint = Point <$> randomRIO (0, size) <*> randomRIO (0, size)
+
+randomIOEnum :: forall s . (Enum s, Bounded s) => IO s
+randomIOEnum = toEnum <$> randomRIO (minBound, maxBound)
 
 initWorld :: World
 initWorld = World 0 randomPoint initPlayer initEnemy
