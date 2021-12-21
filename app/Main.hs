@@ -14,7 +14,9 @@ import Lens -- import from src/Lens.hs
 import Control.Monad.State
 
 import Data.List
+import Data.Maybe
 import Data.Monoid
+import Control.Arrow
 import Data.Proxy
 import GHC.TypeLits
 
@@ -150,17 +152,17 @@ type Size = Int
 
 data Direction = RIGHT | LEFT | UP | DOWN deriving (Eq, Show)
 
-right :: Lens' Direction Direction 
-right = lens id (const (const RIGHT))
+right_ :: Lens' Direction Direction 
+right_ = lens id (const (const RIGHT))
 
-left :: Lens' Direction Direction 
-left = lens id (const (const LEFT))
+left_ :: Lens' Direction Direction 
+left_ = lens id (const (const LEFT))
 
-down :: Lens' Direction Direction 
-down = lens id (const (const DOWN))
+down_ :: Lens' Direction Direction 
+down_ = lens id (const (const DOWN))
 
-up :: Lens' Direction Direction 
-up = lens id (const (const UP))
+up_ :: Lens' Direction Direction 
+up_ = lens id (const (const UP))
 
 executable :: Point -> [Direction]
 executable p = 
@@ -173,41 +175,41 @@ executable p =
 
 data Answer = Yes | No deriving (Eq, Show)
 
-yes :: Lens' Answer Answer 
-yes = lens id (const (const Yes))
+yes_ :: Lens' Answer Answer 
+yes_ = lens id (const (const Yes))
 
-no :: Lens' Answer Answer 
-no = lens id (const (const No))
+no_ :: Lens' Answer Answer 
+no_ = lens id (const (const No))
 
 class Registered l where
   command :: Proxy l -> String
 
 instance Registered "y" where
-  command _ = "(y)"
+  command _ = "Yes"
 
 instance Registered "n" where
-  command _ = "(n)"
+  command _ = "No"
 
 instance Registered "l" where
-  command _ = "(l)"
+  command _ = "Left"
 
 instance Registered "r" where
-  command _ = "(r)"
+  command _ = "Right"
 
 instance Registered "d" where
-  command _ = "(d)"
+  command _ = "Down"
 
 instance Registered "u" where
-  command _ = "(u)"
+  command _ = "Up"
 
 instance Registered "w" where
-  command _ = "(w)"
+  command _ = "Move Two Step"
 
 instance Registered "t" where
-  command _ = "(t)"
+  command _ = "Transport"
 
 instance Registered "f" where
-  command _ = "(f)"
+  command _ = "Flash"
 
 -- deprecated ------------------------------------------------------
 
@@ -235,12 +237,12 @@ fromCommand = lookupFromRegistered symbols
 
 data Command' s a = forall l. (KnownSymbol l, Registered l) => Relate (Lens' s a) (Proxy l)
 
-lookupRegisteredSS :: Eq s => [Command' s s] -> s -> Last String
+lookupRegisteredSS :: Eq s => [Command' s s] -> s -> Last (String, String)
 lookupRegisteredSS = lookup_
   where
-    lookup_ :: Eq s => [Command' s s] -> s -> Last String
+    lookup_ :: Eq s => [Command' s s] -> s -> Last (String, String)
     lookup_ [] _ = Last Nothing
-    lookup_ ((Relate l p) : xs) ans = if ans ^. l == ans then Last (Just $ symbolVal p) else lookup_ xs ans
+    lookup_ ((Relate l p) : xs) ans = if ans ^. l == ans then Last (Just $ (symbolVal &&& command) p) else lookup_ xs ans
 
 lookupFromRegisteredSS :: [Command' s s] -> String -> s -> Last s
 lookupFromRegisteredSS = lookup_
@@ -249,12 +251,12 @@ lookupFromRegisteredSS = lookup_
     lookup_ [] _ _ = Last Nothing
     lookup_ ((Relate l p) : xs) s ans = if symbolVal p == s then Last (Just $ ans ^. l) else lookup_ xs s ans
 
-lookupRegisteredSB :: Eq s => [Command' s Bool] -> s -> Last String
+lookupRegisteredSB :: Eq s => [Command' s Bool] -> s -> Last (String, String)
 lookupRegisteredSB = lookup_
   where
-    lookup_ :: Eq s => [Command' s Bool] -> s -> Last String
+    lookup_ :: Eq s => [Command' s Bool] -> s -> Last (String, String)
     lookup_ [] _ = Last Nothing
-    lookup_ ((Relate l p) : xs) ans = if ans ^. l then Last (Just $ symbolVal p) else lookup_ xs ans
+    lookup_ ((Relate l p) : xs) ans = if ans ^. l then Last (Just $ (symbolVal &&& command) p) else lookup_ xs ans
 
 lookupFromRegisteredSB :: [Command' s Bool] -> String -> s -> Last Bool
 lookupFromRegisteredSB = lookup_
@@ -266,15 +268,15 @@ lookupFromRegisteredSB = lookup_
 
 class CommandObj s a | s -> a where
   symbols :: [Command' s a]
-  lookupRegistered :: s -> Last String
+  lookupRegistered :: s -> Last (String, String)
   lookupFromRegistered :: String -> s -> Last a
 
 
 instance CommandObj Answer Answer where
   symbols = 
     [
-      Relate yes (Proxy :: Proxy "y"), 
-      Relate no (Proxy :: Proxy "n")
+      Relate yes_ (Proxy :: Proxy "y"), 
+      Relate no_ (Proxy :: Proxy "n")
     ]
     
   lookupRegistered = lookupRegisteredSS symbols
@@ -284,10 +286,10 @@ instance CommandObj Answer Answer where
 instance CommandObj Direction Direction where
   symbols = 
     [
-      Relate left (Proxy :: Proxy "l"),
-      Relate right (Proxy :: Proxy "r"),
-      Relate down (Proxy :: Proxy "d"),
-      Relate up (Proxy :: Proxy "u")
+      Relate left_ (Proxy :: Proxy "l"),
+      Relate right_ (Proxy :: Proxy "r"),
+      Relate down_ (Proxy :: Proxy "d"),
+      Relate up_ (Proxy :: Proxy "u")
     ]
 
   lookupRegistered = lookupRegisteredSS symbols
@@ -308,26 +310,30 @@ data Descriptor s =
   Descriptor 
   {
     _tag :: String,
-    _elem :: [s] 
+    _elem :: s 
   } deriving Eq
 
 tag :: Lens' (Descriptor s) String
 tag = lens (\(Descriptor t _) -> t) (\d t -> d {_tag=t})
 
-elem :: Lens' (Descriptor s) [s]
+elem :: Lens' (Descriptor [s]) [s]
 elem = lens (\(Descriptor _ e) -> e) (\d e -> d {_elem=e})
 
-instance (CommandObj s a) => Show (Descriptor s) where
-  show d = ""
+instance (CommandObj s a) => Show (Descriptor [s]) where
+  show (Descriptor t xs) = t <> enum xs  
+    where
+      enum xs = intercalate " or " (uncurry (<>) . (fromMaybe ("", "") . getLast . lookupRegistered) <$> xs) 
 
+instance Show (Descriptor Extra) where
+  show (Descriptor t ex) = ""
 
 class Description d where
-  descript :: Descriptor d 
+  descript :: d -> Descriptor d 
 
-instance Description Answer where
+instance Description [Answer] where
   descript = undefined 
 
-instance Description Direction where
+instance Description [Direction] where
   descript = undefined
 
 instance Description Extra where
