@@ -412,8 +412,15 @@ randomPoint = Point 0 0
 randomIOPoint :: IO Point
 randomIOPoint = Point <$> randomRIO (0, size) <*> randomRIO (0, size)
 
-randomIOEnum :: forall s . (Enum s, Bounded s) => IO s
-randomIOEnum = toEnum <$> randomRIO (minBound, maxBound)
+randomIODir :: IO Direction
+randomIODir = 
+  let range = (fromEnum (minBound :: Direction), fromEnum (maxBound :: Direction)) :: (Int, Int) 
+  in toEnum <$> randomRIO range
+
+randomIORPS :: IO RPS
+randomIORPS = 
+  let range = (fromEnum (minBound :: RPS), fromEnum (maxBound :: RPS)) :: (Int, Int) 
+  in toEnum <$> randomRIO range
 
 initWorld :: World
 initWorld = World 0 randomPoint initPlayer initEnemy
