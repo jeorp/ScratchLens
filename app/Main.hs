@@ -13,6 +13,7 @@ module Main where
 
 import Lens -- import from src/Lens.hs
 
+import System.Exit
 import Control.Monad.State
 
 import Data.List
@@ -149,20 +150,24 @@ data Enemy =
     _enemyName :: Dictionary, 
     _enemyPoint :: Point, 
     _dis :: Int,
-    _goal :: Bool
+    _goal :: Bool,
+    _hp :: Int
   } deriving (Show, Eq)
 
 enemyName :: Lens' Enemy Dictionary
-enemyName = lens (\(Enemy n _ _ _) -> n) (\e n -> e {_enemyName = n})
+enemyName = lens (\(Enemy n _ _ _ _) -> n) (\e n -> e {_enemyName = n})
 
 enemyPoint :: Lens' Enemy Point
-enemyPoint = lens (\(Enemy _ p _ _) -> p) (\e p -> e {_enemyPoint = p})
+enemyPoint = lens (\(Enemy _ p _ _ _) -> p) (\e p -> e {_enemyPoint = p})
 
 dis :: Lens' Enemy Int
-dis = lens (\(Enemy _ _ r _) -> r) (\e r -> e {_dis = r})
+dis = lens (\(Enemy _ _ r _ _) -> r) (\e r -> e {_dis = r})
 
 goal :: Lens' Enemy Bool
-goal = lens (\(Enemy _ _ _ g) -> g) (\e g -> e {_goal = g})
+goal = lens (\(Enemy _ _ _ g _) -> g) (\e g -> e {_goal = g})
+
+hp :: Lens' Enemy Int
+hp = lens (\(Enemy _ _ _ _ h) -> h) (\e h -> e {_hp = h})
 
 data World = 
   World 
@@ -512,6 +517,9 @@ printBoard p d = undefined
 size :: Size
 size = 5
 
+enemyHP :: Int
+enemyHP = 3
+
 initPlayerPos :: Point
 initPlayerPos = Point 0 0
 
@@ -531,7 +539,7 @@ randomEnemyName :: Dictionary
 randomEnemyName = Dictionary "" ""
 
 initEnemy :: Enemy
-initEnemy = Enemy randomEnemyName initEnemyPos (size*2) False
+initEnemy = Enemy randomEnemyName initEnemyPos (size*2) False enemyHP
 
 randomPoint :: Point
 randomPoint = Point 0 0
@@ -684,8 +692,26 @@ enemyAction = do
         let isRPS = getLast $ lookupFromRegisteredA input Rock
         case isRPS of
           Just rps -> do
-            return () -- latter
+            randomRps <- liftIO randomIORPS
+            mapM_ (liftIO . putStrLn) 
+             [
+               "You are .. " <> show rps,
+               "..",
+               "Enemy is .. " <> show randomRps
+             ]
+            case rpsGo rps randomRps of
+              Win -> (liftIO . putStrLn) "You Win !" >> winnerAction
+              Draw -> (liftIO . putStrLn) "Draw .. Again !" >> doRPS
+              Defeat -> (liftIO . putStrLn) "You Defeat !" >> gameEnd
           _ -> (liftIO . putStrLn) "Invalid command" >> doRPS
+        where
+          winnerAction :: Game ()
+          winnerAction = do
+            (enemy . hp) %= minusOne
+            (liftIO . putStrLn) "Enemy is damaged .."
+            h <- use (enemy . hp)
+            when (h == 0) grandEnd
+            (liftIO . putStrLn) "Enemty is still alive .."
 
 updateWorld :: Game ()
 updateWorld = do
@@ -775,6 +801,7 @@ qContinue = do
           "Ok, Goodbye " <> name_ <> ".",
           "I sleep .."
         ]
+      liftIO exitSuccess 
 
 gameEnd :: Game ()
 gameEnd = do
@@ -793,6 +820,23 @@ gameEnd = do
     ]
   qContinue
 
+grandEnd :: Game ()
+grandEnd = do
+  mapM_ (liftIO . putStrLn) 
+    [
+      "Enemy is defeat ..",
+      "..",
+      "World is brigter ..",
+      "..",
+      "You understand where you stand at first time ..",
+      "..",
+      "....",
+      "This board is the partion of World Wide",
+      "..",
+      "...",
+      "......",
+      "Prepare for next adventure ....."
+    ]
 
 
 game :: Game ()
