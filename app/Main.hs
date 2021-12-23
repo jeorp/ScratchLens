@@ -58,6 +58,30 @@ trans = lens (\(Extra _ b _) -> b) (\e b -> e {_trans=b})
 flash :: Lens' Extra Bool
 flash = lens (\(Extra _ _ b) -> b) (\e b -> e {_flash=b})
 
+data Ex = MoveTwo | Trans | Flash deriving (Eq, Ord, Enum, Show, Bounded)
+
+extraToEx :: Extra -> [Ex]
+extraToEx ex = 
+  let xs = []
+      addMoveTwo = if ex ^. moveTwo then MoveTwo : xs else xs
+      addTrans = if ex ^. trans then Trans : addMoveTwo else addMoveTwo
+      addFlash = if ex ^. flash then Flash : addTrans else addTrans
+    in addFlash
+
+exToExtraLens :: Ex -> Lens' Extra Bool
+exToExtraLens MoveTwo = moveTwo
+exToExtraLens Trans = trans
+exToExtraLens Flash = flash
+
+moveTwo_ :: Lens' Ex Ex
+moveTwo_ = lens (const MoveTwo) (const id)
+
+trans_ :: Lens' Ex Ex
+trans_ = lens (const Trans) (const id)
+
+flash_ :: Lens' Ex Ex
+flash_ = lens (const Flash) (const id)
+
 type Name = String
 
 data Player =
@@ -65,17 +89,21 @@ data Player =
   {
     _playerName :: Name, 
     _playerPoint :: Point,
+    _extraFlag :: Bool,
     _extra :: Extra
   } deriving (Show, Eq)
 
 playerName :: Lens' Player Name
-playerName = lens (\(Player n _ _) -> n) (\obj n -> obj {_playerName=n})
+playerName = lens (\(Player n _ _ _) -> n) (\obj n -> obj {_playerName=n})
 
 playerPoint :: Lens' Player Point
-playerPoint = lens (\(Player _ p _) -> p) (\obj p -> obj {_playerPoint=p})
+playerPoint = lens (\(Player _ p _ _) -> p) (\obj p -> obj {_playerPoint=p})
+
+extraFlag :: Lens' Player Bool
+extraFlag = lens (\(Player _ _ e _) -> e) (\obj e -> obj {_extraFlag=e})
 
 extra :: Lens' Player Extra
-extra = lens (\(Player _ _ e) -> e) (\obj e -> obj {_extra=e})
+extra = lens (\(Player _ _ _ e) -> e) (\obj e -> obj {_extra=e})
 
 data Dictionary = 
   Dictionary 
@@ -157,10 +185,10 @@ type Size = Int
 data Direction = RIGHT | LEFT | UP | DOWN deriving (Eq, Ord, Enum, Show, Bounded)
 
 right_ :: Lens' Direction Direction 
-right_ = lens (const LEFT) (\dir s -> s)
+right_ = lens (const RIGHT) (\dir s -> s)
 
 left_ :: Lens' Direction Direction 
-left_ = lens (const RIGHT) (\dir s -> s)
+left_ = lens (const LEFT) (\dir s -> s)
 
 down_ :: Lens' Direction Direction 
 down_ = lens (const DOWN) (\dir s -> s)
@@ -232,8 +260,31 @@ instance Registered "rock" where
 instance Registered "paper" where
   command _ = "Paper"
 
+instance Registered "o" where
+  command _ = "Display abalable commands"
+
 instance Registered "scissors" where
   command _ = "Scissors"
+
+instance Registered "-Dplayer_name" where
+  command _ = "Display PlayerName"
+
+instance Registered "-Splayer_name" where
+  command _ = "Set PlayerName"
+
+instance Registered "-Denemy_name" where
+  command _ = "Display EnemyName"
+
+instance Registered "-Senemy_name" where
+  command _ = "Ser EnemyName"
+
+instance Registered "-Dturn" where
+  command _ = "Display trun"
+
+instance Registered "-Access" where
+  command _ = "Access"
+
+
 
 -- deprecated ------------------------------------------------------
 
@@ -337,6 +388,17 @@ instance CommandObj Direction Direction where
   lookupRegistered = lookupRegisteredSS symbols
   lookupFromRegisteredA = lookupFromRegisteredSS symbols
 
+instance CommandObj Ex Ex where
+  symbols = 
+    [
+      Relate moveTwo_ (Proxy :: Proxy "w"),
+      Relate trans_ (Proxy :: Proxy "t"),
+      Relate flash_ (Proxy :: Proxy "f")
+    ]
+  
+  lookupRegistered = lookupRegisteredSS symbols
+  lookupFromRegisteredA = lookupFromRegisteredSS symbols
+
 
 instance CommandObj Extra Bool where
   symbols = 
@@ -381,6 +443,9 @@ instance Description [Answer] where
 instance Description [Direction] where
   descript = Descriptor "Direction : "
 
+instance Description [Ex] where
+  descript = Descriptor "Extra : "
+
 instance Description Extra where
   descript = Descriptor "Extra : "
 
@@ -400,7 +465,7 @@ initPlayerExtra :: Extra
 initPlayerExtra = Extra True True True
 
 initPlayer :: Player
-initPlayer = Player "" initPlayerPos initPlayerExtra
+initPlayer = Player "" initPlayerPos True initPlayerExtra
 
 dictionaryPath :: String
 dictionaryPath = "gene-utf8.txt" -- set dictionary file path. 
@@ -456,9 +521,9 @@ gameStart = do
 playerAction :: Game ()
 playerAction = do
   playerPos <- use (player . pos)
-  ex <- use (player . extra)
+  ex_ <- use (player . extra)
   let directions = executable playerPos
-      
+      exs = extraToEx ex_
       description = do
         mapM_ (liftIO . putStrLn) 
           [
@@ -467,13 +532,36 @@ playerAction = do
             "Your commnad is ",
             show $ descript directions,
             "Or,", 
-            show $ descript ex
+            show $ descript exs
           ] :: Game ()
       
       action = do
+        flag <- use (player . extraFlag)
         input <- liftIO getLine
-        return ()
-      
+        let isMoveCommand = lookupFromRegisteredA input LEFT
+            isExCommand = lookupFromRegisteredA input MoveTwo
+        case getLast isMoveCommand of
+          (Just d) -> if d `elem` directions
+            then doMove d 
+            else (liftIO .putStrLn) "This command is not executable" >> description >> action
+          Nothing -> if flag 
+            then
+              case getLast isExCommand of
+                (Just e) -> if e `elem` exs
+                  then doEx e 
+                  else (liftIO .putStrLn) "This command is not executable" >> description >> action
+                Nothing -> (liftIO . putStrLn) "I don't know what you say" >> action
+            else (liftIO . putStrLn) "Where you move ?" >> description >> action 
+
+        return () :: Game ()
+        where
+          doMove :: Direction -> Game ()
+          doMove d = do
+            return ()
+          doEx :: Ex -> Game ()
+          doEx e = do
+            return ()
+
       in description >> action
 
 
