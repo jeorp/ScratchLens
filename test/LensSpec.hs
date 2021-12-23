@@ -44,6 +44,13 @@ getPointX = use (point . x)
 moveOneToY :: State Foo ()
 moveOneToY = (point . y) %= (+1)
 
+data Dir = LEFT | RIGHT deriving (Show, Eq)
+left_ :: Lens' Dir Dir
+left_ = lens (const LEFT) (\dir s -> s)
+
+right_ :: Lens' Dir Dir
+right_ = lens id (\dir s -> s)
+
 spec :: Spec
 spec = do
   describe "test Lens" $ do
@@ -70,3 +77,6 @@ spec = do
 
       it "test lens on context of state 3" $ do
         runState moveOneToY  foo `shouldBe` ((), foo {_point = Point 1 3})
+
+      it "test geter Light is light" $ do
+        RIGHT ^. left_ `shouldBe` LEFT

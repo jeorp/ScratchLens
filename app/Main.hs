@@ -1,10 +1,12 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE  RankNTypes #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE  AllowAmbiguousTypes #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module Main where
@@ -155,16 +157,16 @@ type Size = Int
 data Direction = RIGHT | LEFT | UP | DOWN deriving (Eq, Ord, Enum, Show, Bounded)
 
 right_ :: Lens' Direction Direction 
-right_ = lens id (const (const RIGHT))
+right_ = lens (const LEFT) (\dir s -> s)
 
 left_ :: Lens' Direction Direction 
-left_ = lens id (const (const LEFT))
+left_ = lens (const RIGHT) (\dir s -> s)
 
 down_ :: Lens' Direction Direction 
-down_ = lens id (const (const DOWN))
+down_ = lens (const DOWN) (\dir s -> s)
 
 up_ :: Lens' Direction Direction 
-up_ = lens id (const (const UP))
+up_ = lens (const UP) (\dir s -> s)
 
 executable :: Point -> [Direction]
 executable p = 
@@ -178,21 +180,21 @@ executable p =
 data Answer = Yes | No deriving (Eq, Ord, Enum, Show, Bounded)
 
 yes_ :: Lens' Answer Answer 
-yes_ = lens id (const (const Yes))
+yes_ = lens (const Yes) (\ans s -> s)
 
 no_ :: Lens' Answer Answer 
-no_ = lens id (const (const No))
+no_ = lens (const No) (\ans s -> s)
 
 data RPS = Rock | Paper | Scissors deriving (Eq, Ord, Enum, Show, Bounded)
 
 rock_ :: Lens' RPS RPS 
-rock_ = lens id (const (const Rock))
+rock_ = lens (const Rock) (\rps s -> s)
 
 paper_ :: Lens' RPS RPS 
-paper_ = lens id (const (const Paper))
+paper_ = lens (const Paper) (\rps s -> s)
 
 scissors_ :: Lens' RPS RPS 
-scissors_ = lens id (const (const Scissors))
+scissors_ = lens (const Scissors) (\rps s -> s)
 
 class Registered l where
   command :: Proxy l -> String
@@ -264,7 +266,7 @@ lookupRegisteredSS = lookup_
   where
     lookup_ :: Eq s => [Command' s s] -> s -> Last [(String, String)]
     lookup_ [] _ = Last Nothing
-    lookup_ ((Relate l p) : xs) ans = if ans ^. l == ans then Last (Just [(symbolVal &&& command) p]) else lookup_ xs ans
+    lookup_ ((Relate l p) : xs) ans = if (ans ^. l) == ans then Last (Just [(symbolVal &&& command) p]) else lookup_ xs ans
 
 lookupFromRegisteredSS :: [Command' s s] -> String -> s -> Last s
 lookupFromRegisteredSS = lookup_
@@ -277,11 +279,11 @@ lookupRegisteredSB :: Eq s => [Command' s Bool] -> s -> Last [(String, String)]
 lookupRegisteredSB = lookup_ []
   where
     lookup_ :: Eq s => [(String, String)] -> [Command' s Bool] -> s -> Last [(String, String)]
-    lookup_ [] _ _ = Last Nothing
-    lookup_ a [] _ = Last $ Just a
     lookup_ a ((Relate l p) : xs) ans = if ans ^. l 
       then lookup_ ((symbolVal &&& command) p : a) xs ans
       else lookup_ a xs ans
+    lookup_ [] [] _ = Last Nothing
+    lookup_ a [] _ = Last $ Just a
 
 lookupFromRegisteredSB :: [Command' s Bool] -> String -> s -> Last Bool
 lookupFromRegisteredSB = lookup_
@@ -290,12 +292,15 @@ lookupFromRegisteredSB = lookup_
     lookup_ [] _ _ = Last Nothing
     lookup_ ((Relate l p) : xs) s ans = if symbolVal p == s then Last (Just $ ans ^. l) else lookup_ xs s ans
 
+isRegistered_ :: [Command' s a] -> String -> Bool
+isRegistered_ [] _ = False
+isRegistered_ ((Relate l p) : xs) s = symbolVal p == s || isRegistered_ xs s
+
 
 class CommandObj s a | s -> a where
   symbols :: [Command' s a]
   lookupRegistered :: s -> Last [(String, String)]
-  lookupFromRegistered :: String -> s -> Last a
-
+  lookupFromRegisteredA :: String -> s -> Last a
 
 instance CommandObj Answer Answer where
   symbols = 
@@ -305,7 +310,7 @@ instance CommandObj Answer Answer where
     ]
     
   lookupRegistered = lookupRegisteredSS symbols
-  lookupFromRegistered = lookupFromRegisteredSS symbols
+  lookupFromRegisteredA = lookupFromRegisteredSS symbols
 
 
 instance CommandObj RPS RPS where
@@ -317,7 +322,7 @@ instance CommandObj RPS RPS where
     ]
     
   lookupRegistered = lookupRegisteredSS symbols
-  lookupFromRegistered = lookupFromRegisteredSS symbols
+  lookupFromRegisteredA = lookupFromRegisteredSS symbols
 
 
 instance CommandObj Direction Direction where
@@ -330,7 +335,7 @@ instance CommandObj Direction Direction where
     ]
 
   lookupRegistered = lookupRegisteredSS symbols
-  lookupFromRegistered = lookupFromRegisteredSS symbols
+  lookupFromRegisteredA = lookupFromRegisteredSS symbols
 
 
 instance CommandObj Extra Bool where
@@ -342,7 +347,7 @@ instance CommandObj Extra Bool where
     ]
   
   lookupRegistered = lookupRegisteredSB symbols
-  lookupFromRegistered = lookupFromRegisteredSB symbols
+  lookupFromRegisteredA = lookupFromRegisteredSB symbols
 
 data Descriptor s = 
   Descriptor 
@@ -354,10 +359,10 @@ data Descriptor s =
 tag :: Lens' (Descriptor s) String
 tag = lens (\(Descriptor t _) -> t) (\d t -> d {_tag=t})
 
-elem :: Lens' (Descriptor [s]) [s]
-elem = lens (\(Descriptor _ e) -> e) (\d e -> d {_elem=e})
+element :: Lens' (Descriptor [s]) [s]
+element = lens (\(Descriptor _ e) -> e) (\d e -> d {_elem=e})
 
-instance (CommandObj s a) => Show (Descriptor [s]) where
+instance (Show s, CommandObj s a) => Show (Descriptor [s]) where -- fmap ~ xs is bad implemention
   show (Descriptor t xs) = t <> enum xs  
     where
       enum xs = intercalate " or " (uncurry (<>) . (maybe ("", "") head . getLast . lookupRegistered) <$> xs) 
@@ -467,12 +472,7 @@ playerAction = do
       
       action = do
         input <- liftIO getLine
-        playerAction input
-        return () :: Game ()
-          where
-            playerAction :: String -> Game ()
-            playerAction s = do 
-              void $ return ex
+        return ()
       
       in description >> action
 
@@ -515,6 +515,57 @@ gameLoop = do
       loop
 
 
+qContinue :: Game ()
+qContinue = do
+  s <- liftIO getLine
+  let isYes = getLast (lookupFromRegisteredA s Yes) :: Maybe Answer
+      isNo =  getLast (lookupFromRegisteredA s No) :: Maybe Answer
+  case isYes of
+    Just Yes -> continueYes
+    _ -> case isNo of
+      Just No -> end
+      _ -> (liftIO . putStrLn) "I don't no what you say." >> qContinue
+  where
+    continueYes :: Game ()
+    continueYes = do
+      name_ <- use (player . name)
+      mapM_ (liftIO . putStrLn)
+        [
+          "Ok, you change player name " <> "(" <> name_ <> ")" <> " ?",
+          show $ descript [Yes, No]  
+        ]
+      continueQRename
+      where
+        continueQRename :: Game ()
+        continueQRename = do
+          s <- liftIO getLine
+          let isYes = getLast (lookupFromRegisteredA s Yes) :: Maybe Answer
+              isNo =  getLast (lookupFromRegisteredA s No) :: Maybe Answer
+          case isYes of
+            Just Yes -> continueRename
+            _ -> case isNo of
+              Just No -> continueSameName
+              _ -> (liftIO . putStrLn) "I don't what you say" >> continueQRename
+          where
+            continueRename :: Game ()
+            continueRename = game
+            continueSameName :: Game ()
+            continueSameName = do
+              name_ <- use (player . name)
+              put initWorld
+              (player . name) .= name_
+              gameStart >> gameLoop
+
+    end :: Game ()
+    end = do
+      name_ <- use (player . name)
+      mapM_ (liftIO . putStrLn) 
+        [
+          "",
+          "Ok, Goodbye " <> name_ <> ".",
+          "I sleep .."
+        ]
+
 gameEnd :: Game ()
 gameEnd = do
   t <- use turn
@@ -528,50 +579,10 @@ gameEnd = do
       "",
       "",
       "Play continue .. ?",
-      "y or n"
+      show $ descript [Yes, No]
     ]
-  yesOrNo <- liftIO getLine
-  loopOrEnd yesOrNo
-  where 
-    loopOrEnd :: String -> Game ()
-    loopOrEnd "n" = do
-      name_ <- use (player . name)
-      mapM_ (liftIO . putStrLn) 
-        [
-          "",
-          "Ok, Goodbye " <> name_ <> ".",
-          "I sleep .."
-        ]
-    
-    loopOrEnd "y" = do
-      name_ <- use (player . name)
-      mapM_ (liftIO . putStrLn)
-        [
-          "Ok, you change player name " <> "(" <> name_ <> ")" <> " ?",
-          "y or n" 
-        ]
-      isRename <- liftIO getLine
-      continueRename isRename 
-      where
-        continueRename :: String -> Game ()
-        continueRename "n" = do
-          name_ <- use (player . name)
-          put initWorld
-          (player . name) .= name_
-          gameStart >> gameLoop
-          
-        continueRename "y" = do
-          game
+  qContinue
 
-        continueRename _ = do
-          liftIO $ putStrLn "plese y or n, I'm not clever"
-          yesOrNo <- liftIO getLine
-          continueRename yesOrNo
-
-    loopOrEnd _ = do
-      liftIO $ putStrLn "plese y or n, I'm not clever"
-      yesOrNo <- liftIO getLine
-      loopOrEnd yesOrNo
 
 
 game :: Game ()
