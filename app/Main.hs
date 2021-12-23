@@ -15,6 +15,7 @@ import Lens -- import from src/Lens.hs
 
 import System.Exit
 import Control.Monad.State
+import Control.Monad.RWS
 
 import Data.List
 import Data.Maybe
@@ -175,20 +176,24 @@ data World =
     _turn :: Int,
     _warpPoint :: Point, 
     _player :: Player, 
-    _enemy :: Enemy
+    _enemy :: Enemy,
+    _logs :: [String]
   } deriving (Show, Eq)
 
 turn :: Lens' World Int
-turn = lens (\(World t _ _ _) -> t) (\w t -> w {_turn=t})
+turn = lens (\(World t _ _ _ _) -> t) (\w t -> w {_turn=t})
 
 warpPoint :: Lens' World Point
-warpPoint = lens (\(World _ p _ _) -> p) (\w p -> w {_warpPoint=p})
+warpPoint = lens (\(World _ p _ _ _) -> p) (\w p -> w {_warpPoint=p})
 
 player :: Lens' World Player
-player = lens (\(World _ _ p _) -> p) (\w p -> w {_player=p})
+player = lens (\(World _ _ p _ _) -> p) (\w p -> w {_player=p})
 
 enemy :: Lens' World Enemy
-enemy = lens (\(World _ _ _ e) -> e) (\w e -> w {_enemy=e})
+enemy = lens (\(World _ _ _ e _) -> e) (\w e -> w {_enemy=e})
+
+logs :: Lens' World [String]
+logs = lens (\(World _ _ _ _ l) -> l) (\w l -> w {_logs=l})
 
 class HasPoint c where
   pos :: Lens' c  Point
@@ -208,7 +213,7 @@ instance HasName Player where
 instance HasName Enemy where
   name = enemyName . word
 
-type Game = StateT World IO
+type Game = RWST Config [String] World IO
 
 type Size = Int
 
@@ -238,13 +243,13 @@ dirToFunctional RIGHT = over plusOne x
 dirToFunctional UP = over plusOne y
 dirToFunctional DOWN = over minusOne y
 
-executable :: Point -> [Direction]
-executable p = 
+executable :: Size -> Point -> [Direction]
+executable s p = 
   let xs = []
       addLeft = if p ^. x > 0 then LEFT : xs else xs
-      addRight = if p ^. x < size then RIGHT : addLeft else addLeft
+      addRight = if p ^. x < s then RIGHT : addLeft else addLeft
       addDown = if p ^. y > 0 then DOWN : addRight else addRight
-      addUp = if p ^. y < size then UP : addDown else addDown
+      addUp = if p ^. y < s then UP : addDown else addDown
       in addUp
 
 data Answer = Yes | No deriving (Eq, Ord, Enum, Show, Bounded)
@@ -520,6 +525,20 @@ size = 5
 enemyHP :: Int
 enemyHP = 3
 
+data Config = Config 
+  {
+    _boardSize :: Int,
+    _maxEnemyHp :: Int 
+  } deriving (Show, Eq)
+
+boardSize :: Lens' Config Int
+boardSize = lens (\(Config b _) -> b) (\c b -> c {_boardSize=b})
+
+maxEnemyHp :: Lens' Config Int
+maxEnemyHp = lens (\(Config _ h) -> h) (\c h -> c {_maxEnemyHp=h})
+
+config = Config size enemyHP
+
 initPlayerPos :: Point
 initPlayerPos = Point 0 0
 
@@ -558,13 +577,17 @@ randomIORPS =
   in toEnum <$> randomRIO range
 
 initWorld :: World
-initWorld = World 0 randomPoint initPlayer initEnemy
+initWorld = World 0 randomPoint initPlayer initEnemy []
+
+tell' :: String -> Game ()
+tell' s = logs %= (s:)
 
 gameInit :: Game ()
 gameInit = do
   liftIO $ putStrLn "Hello, please tell me your name"
   name_ <- liftIO getLine
   (player . name) .= name_
+  tell' $ "Hello, " <> name_
 
 gameStart :: Game ()
 gameStart = do
@@ -588,7 +611,8 @@ playerAction = do
   flag <- use (player . extraFlag)
   playerPos <- use (player . pos)
   ex_ <- use (player . extra)
-  let directions = executable playerPos
+  c <- ask 
+  let directions = executable  (c ^. boardSize) playerPos
       exs = extraToEx ex_
       description = do
         mapM_ (liftIO . putStrLn) 
@@ -835,8 +859,15 @@ grandEnd = do
       "..",
       "...",
       "......",
-      "Prepare for next adventure ....."
+      "Prepare for next adventure .....",
+      "......",
+      "............"
     ]
+  
+  tell' "       __fin__"
+  ls <- use logs
+  mapM_ (liftIO . putStrLn) (reverse ls)
+  liftIO exitSuccess 
 
 
 game :: Game ()
@@ -844,7 +875,7 @@ game = gameInit >> gameStart >> gameLoop
 
 
 run :: Game () -> IO ()
-run game = fst <$> runStateT game initWorld
+run game = void $ runRWST game config initWorld
 
 
 main :: IO ()
