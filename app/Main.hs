@@ -196,6 +196,18 @@ down_ = lens (const DOWN) (\dir s -> s)
 up_ :: Lens' Direction Direction 
 up_ = lens (const UP) (\dir s -> s)
 
+plusOne :: Int -> Int
+plusOne i = i + 1
+
+minusOne :: Int -> Int
+minusOne i = i - 1
+
+dirToFunctional :: Direction -> Point -> Point
+dirToFunctional LEFT = over minusOne x
+dirToFunctional RIGHT = over plusOne x
+dirToFunctional UP = over plusOne y
+dirToFunctional DOWN = over minusOne y
+
 executable :: Point -> [Direction]
 executable p = 
   let xs = []
@@ -557,7 +569,7 @@ playerAction = do
         where
           doMove :: Direction -> Game ()
           doMove d = do
-            return ()
+            (player . pos) %= dirToFunctional d
           doEx :: Ex -> Game ()
           doEx e = do
             return ()
