@@ -261,6 +261,23 @@ paper_ = lens (const Paper) (\rps s -> s)
 scissors_ :: Lens' RPS RPS 
 scissors_ = lens (const Scissors) (\rps s -> s)
 
+data RPSResult = Win | Defeat | Draw deriving (Show, Eq)
+
+rpsGo :: RPS -> RPS -> RPSResult
+rpsGo Rock j = case j of
+  Rock -> Draw
+  Paper -> Defeat
+  Scissors -> Win
+rpsGo Paper j = case j of
+  Rock -> Win
+  Paper -> Draw
+  Scissors -> Defeat
+rpsGo Scissors j = case j of
+  Rock -> Defeat
+  Paper -> Win
+  Scissors -> Draw
+
+
 class Registered l where
   command :: Proxy l -> String
 
