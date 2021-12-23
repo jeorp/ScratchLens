@@ -35,11 +35,36 @@ data Point =
     _y :: Int
   } deriving (Show, Eq)
 
+
 x :: Lens' Point Int
 x = lens (\(Point x _) -> x) (\p x -> p {_x=x})
 
 y :: Lens' Point Int
 y = lens (\(Point _ y) -> y) (\p y -> p {_y=y})
+
+instance Num Point where
+  (Point px py) + (Point qx qy) = Point (px+qx) (py+qy)
+  (Point px py) * (Point qx qy) = Point (px*qx) (py*qy)
+  abs (Point px py) = Point (abs px) (abs py)
+  signum (Point px py) = Point (signum px) (signum py)
+  fromInteger i = Point (fromInteger i) (fromInteger i)
+  negate (Point px py) = Point (negate px) (negate py)
+
+dist :: Point -> Point -> Int
+dist p q = let r = abs (p - q) in r ^. x + r ^. y
+
+vectorToDir :: Point -> Direction
+vectorToDir p = 
+  let absP = abs p
+      absX = absP ^. x
+      absY = absP ^. y
+  in if absX > absY
+      then if p ^. x >= 0
+        then RIGHT
+        else LEFT
+      else if p ^. y >= 0
+        then UP
+        else DOWN 
 
 data Extra = 
   Extra 
@@ -455,6 +480,9 @@ instance Description [Answer] where
 instance Description [Direction] where
   descript = Descriptor "Direction : "
 
+instance Description [RPS] where
+  descript = Descriptor "Rock Scissors Paper GO!!! : "
+
 instance Description [Ex] where
   descript = Descriptor "Extra : "
 
@@ -474,7 +502,7 @@ initEnemyPos :: Point
 initEnemyPos = Point size size
 
 initPlayerExtra :: Extra
-initPlayerExtra = Extra True True True
+initPlayerExtra = Extra True False True
 
 initPlayer :: Player
 initPlayer = Player "" initPlayerPos True initPlayerExtra
@@ -532,23 +560,25 @@ gameStart = do
 
 playerAction :: Game ()
 playerAction = do
+  flag <- use (player . extraFlag)
   playerPos <- use (player . pos)
   ex_ <- use (player . extra)
   let directions = executable playerPos
       exs = extraToEx ex_
       description = do
         mapM_ (liftIO . putStrLn) 
-          [
-            "",
-            "Now, you are " <> show (playerPos ^. x, playerPos ^. y) <> " .",
-            "Your commnad is ",
-            show $ descript directions,
-            "Or,", 
-            show $ descript exs
-          ] :: Game ()
+          (
+            [
+              "",
+              "Now, you are " <> show (playerPos ^. x, playerPos ^. y) <> " .",
+              "Your commnad is ",
+              show $ descript directions
+            ]
+            ++
+            ["Or \n" ++ show (descript exs) | flag]
+          ) :: Game ()
       
       action = do
-        flag <- use (player . extraFlag)
         input <- liftIO getLine
         let isMoveCommand = lookupFromRegisteredA input LEFT
             isExCommand = lookupFromRegisteredA input MoveTwo
@@ -570,16 +600,75 @@ playerAction = do
           doMove :: Direction -> Game ()
           doMove d = do
             (player . pos) %= dirToFunctional d
+            (playerPos, enemyPos) <- (,) <$> use (player . pos) <*> use (enemy . pos)
+            if playerPos == enemyPos
+              then (liftIO . putStrLn) "Here is where enemy is!" >> gameEnd
+              else (liftIO . putStrLn) "Succes! Enemy is not here"
           doEx :: Ex -> Game ()
-          doEx e = do
-            return ()
+          doEx MoveTwo = do
+            (liftIO . putStrLn) "This turn, you can move Two Steps."
+            (player . extraFlag) .= False
+            (player . extra . moveTwo) .= False
+            playerAction >> (liftIO . putStrLn) "You can move one more" >> playerAction
+
+          doEx Trans = do
+            (liftIO . putStrLn) "This turn, you can move where you want"
+            
+            -- latter ..
+
+            (player . extraFlag) .= False
+            (player . extra . trans) .= False
+            playerAction
+
+          doEx Flash = do
+            enemyPos <- use (enemy . pos)
+            mapM_ (liftIO . putStrLn) 
+              [
+                "Flash !",
+                "Then world is bright...",
+                "",
+                "Enemy is at ",
+                show (enemyPos ^. x, enemyPos ^. y) <> " you see"
+              ]
+            (player . extraFlag) .= False
+            (player . extra . flash) .= False
+            (liftIO . putStrLn) "Move !" >> playerAction
 
       in description >> action
 
 
 enemyAction :: Game ()
 enemyAction = do
-  return ()
+  (playerPos, enemyPos) <- (,) <$> use (player . pos) <*> use (enemy . pos)
+  (enemy . dis) .= dist playerPos enemyPos
+  (liftIO . putStrLn) "Enemy moves .."
+  (enemy . pos) %= (dirToFunctional . vectorToDir) (playerPos - enemyPos)
+  judge 
+    where
+      judge :: Game ()
+      judge = do
+        (playerPos, enemyPos) <- (,) <$> use (player . pos) <*> use (enemy . pos)
+        let dis_ = dist playerPos enemyPos
+        if dist playerPos enemyPos == 0  
+          then (liftIO . putStrLn) "Player is caught!"  >> doRPS
+          else (enemy . dis) .= dis_ >> (liftIO . putStrLn) "You are still alive .." 
+    
+      doRPS :: Game ()
+      doRPS = do
+        mapM_(liftIO . putStrLn) 
+          [
+            "Rock Scissors Paper Stage!",
+            "If you win then you can escape !",
+            "",
+            "Please input",
+            show $ descript [Rock, Paper, Scissors]  
+          ]
+        input <- liftIO getLine
+        let isRPS = getLast $ lookupFromRegisteredA input Rock
+        case isRPS of
+          Just rps -> do
+            return () -- latter
+          _ -> (liftIO . putStrLn) "Invalid command" >> doRPS
 
 updateWorld :: Game ()
 updateWorld = do
@@ -587,6 +676,10 @@ updateWorld = do
   if isFinish 
     then gameEnd
     else do
+      ex_ <- use (player .extra)
+      let exs = extraToEx ex_
+          hasEx = not $ null exs
+      when hasEx ((player . extraFlag) .= True)
       t <- use turn
       liftIO $ putStrLn $ show t <> " trun is over. Next,"
       turn %= (+1)
@@ -648,7 +741,7 @@ qContinue = do
               _ -> (liftIO . putStrLn) "I don't what you say" >> continueQRename
           where
             continueRename :: Game ()
-            continueRename = game
+            continueRename = put initWorld >> game
             continueSameName :: Game ()
             continueSameName = do
               name_ <- use (player . name)

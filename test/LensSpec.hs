@@ -18,6 +18,18 @@ x = lens (\(Point x _) -> x) (\point x -> point{_x=x})
 y :: Lens' Point Int
 y = lens (\(Point _ y) -> y) (\point y -> point{_y=y})
 
+instance Num Point where
+  (Point px py) + (Point qx qy) = Point (px+qx) (py+qy)
+  (Point px py) * (Point qx qy) = Point (px*qx) (py*qy)
+  abs (Point px py) = Point (abs px) (abs py)
+  signum (Point px py) = Point (signum px) (signum py)
+  fromInteger i = Point (fromInteger i) (fromInteger i)
+  negate (Point px py) = Point (negate px) (negate py)
+
+dist :: Point -> Point -> Int
+dist p q = let r = abs (p - q) in r ^. x + r ^. y
+
+
 
 
 data Foo = Foo {_name :: String, _point :: Point} deriving (Show, Eq)
@@ -80,3 +92,9 @@ spec = do
 
       it "test geter Light is light" $ do
         RIGHT ^. left_ `shouldBe` LEFT
+
+      it "test (0, 0) - (5, 5) == - (5, 5)" $ do
+        Point 0 0 - Point 5 5 `shouldBe` - Point 5 5
+
+      it "test dist from (0,0) to (5, 5) == 10" $ do
+        dist (Point 0 0) (Point 5 5) `shouldBe` 10
