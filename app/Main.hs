@@ -15,7 +15,7 @@ import Lens -- import from src/Lens.hs
 
 import System.Exit
 import Control.Monad.State
-import Control.Monad.RWS
+import Control.Monad.Reader
 
 import Data.List
 import Data.Maybe
@@ -213,7 +213,7 @@ instance HasName Player where
 instance HasName Enemy where
   name = enemyName . word
 
-type Game = RWST Config [String] World IO
+type Game = ReaderT Config  (StateT World IO)
 
 type Size = Int
 
@@ -592,6 +592,7 @@ gameInit = do
 gameStart :: Game ()
 gameStart = do
   name_ <- use (player . name)
+  tell' $ "Log of " <> name_
   mapM_ (liftIO . putStrLn)  
     [
       "hello " <> name_ <> "!!", 
@@ -648,19 +649,22 @@ playerAction = do
         where
           doMove :: Direction -> Game ()
           doMove d = do
+            tell' $ "Player : select " <> show d
             (player . pos) %= dirToFunctional d
             (playerPos, enemyPos) <- (,) <$> use (player . pos) <*> use (enemy . pos)
             if playerPos == enemyPos
-              then (liftIO . putStrLn) "Here is where enemy is!" >> gameEnd
+              then (liftIO . putStrLn) "Here is where enemy is!" >> tell' "Player : killed" >> gameEnd
               else (liftIO . putStrLn) "Succes! Enemy is not here"
           doEx :: Ex -> Game ()
           doEx MoveTwo = do
+            tell' $ "Player : select" <> show MoveTwo
             (liftIO . putStrLn) "This turn, you can move Two Steps."
             (player . extraFlag) .= False
             (player . extra . moveTwo) .= False
             playerAction >> (liftIO . putStrLn) "You can move one more" >> playerAction
 
           doEx Trans = do
+            tell' $ "Player : select" <> show Trans
             (liftIO . putStrLn) "This turn, you can move where you want"
             
             -- latter ..
@@ -670,6 +674,7 @@ playerAction = do
             playerAction
 
           doEx Flash = do
+            tell' $ "Player : select" <> show Flash
             enemyPos <- use (enemy . pos)
             mapM_ (liftIO . putStrLn) 
               [
@@ -699,7 +704,7 @@ enemyAction = do
         (playerPos, enemyPos) <- (,) <$> use (player . pos) <*> use (enemy . pos)
         let dis_ = dist playerPos enemyPos
         if dist playerPos enemyPos == 0  
-          then (liftIO . putStrLn) "Player is caught!"  >> doRPS
+          then (liftIO . putStrLn) "Player is caught!"  >> tell' "Player : status Have got" >> doRPS
           else (enemy . dis) .= dis_ >> (liftIO . putStrLn) "You are still alive .." 
     
       doRPS :: Game ()
@@ -712,11 +717,14 @@ enemyAction = do
             "Please input",
             show $ descript [Rock, Paper, Scissors]  
           ]
+        tell' "--Rock Paper Scissors Stage--"
         input <- liftIO getLine
         let isRPS = getLast $ lookupFromRegisteredA input Rock
         case isRPS of
           Just rps -> do
+            tell' $ "Player : select " <> show rps 
             randomRps <- liftIO randomIORPS
+            tell' $ "Enemy : select " <> show randomRps
             mapM_ (liftIO . putStrLn) 
              [
                "You are .. " <> show rps,
@@ -724,9 +732,9 @@ enemyAction = do
                "Enemy is .. " <> show randomRps
              ]
             case rpsGo rps randomRps of
-              Win -> (liftIO . putStrLn) "You Win !" >> winnerAction
-              Draw -> (liftIO . putStrLn) "Draw .. Again !" >> doRPS
-              Defeat -> (liftIO . putStrLn) "You Defeat !" >> gameEnd
+              Win -> (liftIO . putStrLn) "You Win !" >> tell' "Player : Win" >> winnerAction
+              Draw -> (liftIO . putStrLn) "Draw .. Again !" >> tell' "Player : Draw" >> doRPS
+              Defeat -> (liftIO . putStrLn) "You Defeat !" >> tell' "Player : Defeat" >> gameEnd
           _ -> (liftIO . putStrLn) "Invalid command" >> doRPS
         where
           winnerAction :: Game ()
@@ -734,7 +742,7 @@ enemyAction = do
             (enemy . hp) %= minusOne
             (liftIO . putStrLn) "Enemy is damaged .."
             h <- use (enemy . hp)
-            when (h == 0) grandEnd
+            when (h == 0) (tell' "Enemy : status Dead .." >> grandEnd)
             (liftIO . putStrLn) "Enemty is still alive .."
 
 updateWorld :: Game ()
@@ -759,6 +767,7 @@ gameLoop = do
     loop :: Game ()
     loop = do
       t <- use turn
+      tell' $ "turn is " <> show t
       distance <- use (enemy . dis)
       playerPos <- use (player . pos)
       mapM_ (liftIO . putStrLn) 
@@ -852,7 +861,7 @@ grandEnd = do
       "..",
       "World is brigter ..",
       "..",
-      "You understand where you stand at first time ..",
+      "You understand where you stand for the first time ..",
       "..",
       "....",
       "This board is the partion of World Wide",
@@ -875,7 +884,7 @@ game = gameInit >> gameStart >> gameLoop
 
 
 run :: Game () -> IO ()
-run game = void $ runRWST game config initWorld
+run game = void $ runStateT (runReaderT game config) initWorld
 
 
 main :: IO ()
