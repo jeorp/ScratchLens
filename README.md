@@ -1,10 +1,5 @@
 # ScratchLens
+  
+  
+Scratch lens and sample program using it
 
-Main.hs is sample game program using lens.  
-To run, you need install dictionary file from http://www.namazu.org/%7Etsuchiya/sdic/data/gene.html  
-and conevert utf-8 from SHIFT-JIS using command like below
-
-$ sudo apt install nkf  
-
-locally exists gene.txt then  
-$ nkf gene.txt > gene-utf8.txt
