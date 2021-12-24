@@ -488,15 +488,18 @@ tag = lens (\(Descriptor t _) -> t) (\d t -> d {_tag=t})
 element :: Lens' (Descriptor [s]) [s]
 element = lens (\(Descriptor _ e) -> e) (\d e -> d {_elem=e})
 
+commandPrint :: String -> String -> String
+commandPrint a b = a <> ": " <> b
+
 instance (Show s, CommandObj s a) => Show (Descriptor [s]) where -- fmap ~ xs is bad implemention
   show (Descriptor t xs) = t <> enum xs  
     where
-      enum xs = intercalate " or " (uncurry (<>) . (maybe ("", "") head . getLast . lookupRegistered) <$> xs) 
+      enum xs = intercalate " or " (uncurry commandPrint  . (maybe ("", "") head . getLast . lookupRegistered) <$> xs) 
 
 instance Show (Descriptor Extra) where
   show (Descriptor t ex) = t <> enum ex
     where 
-      enum ex = intercalate " or " $ uncurry (<>) <$> (fromMaybe [] . getLast . lookupRegistered) ex
+      enum ex = intercalate " or " $ uncurry commandPrint <$> (fromMaybe [] . getLast . lookupRegistered) ex
 
 class Description d where
   descript :: d -> Descriptor d 
@@ -552,15 +555,15 @@ initPlayer :: Player
 initPlayer = Player "" initPlayerPos True initPlayerExtra
 
 dictionaryPath :: String
-dictionaryPath = "gene-utf8.txt" -- set dictionary file path. 
+dictionaryPath = "AAAAAAAA.txt" -- set dictionary file path (latter ...)
 
 randomEnemyName :: Dictionary
-randomEnemyName = Dictionary "" ""
+randomEnemyName = Dictionary "" "" -- I want to extract from above path , but sorry latter ...
 
 initEnemy :: Enemy
 initEnemy = Enemy randomEnemyName initEnemyPos (size*2) False enemyHP
 
-randomPoint :: Point
+randomPoint :: Point -- I want to implement warp point, but sorry latter ...
 randomPoint = Point 0 0
 
 randomIOPoint :: IO Point
@@ -579,7 +582,7 @@ randomIORPS =
 initWorld :: World
 initWorld = World 0 randomPoint initPlayer initEnemy []
 
-tell' :: String -> Game ()
+tell' :: String -> Game () -- log on Game monad
 tell' s = logs %= (s:)
 
 gameInit :: Game ()
