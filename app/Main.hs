@@ -25,6 +25,7 @@ import Control.Arrow
 import System.Random
 import Data.Proxy
 import GHC.TypeLits
+import Data.Default.Class
 
 
 
@@ -86,6 +87,9 @@ flash :: Lens' Extra Bool
 flash = lens (\(Extra _ _ b) -> b) (\e b -> e {_flash=b})
 
 data Ex = MoveTwo | Trans | Flash deriving (Eq, Ord, Enum, Show, Bounded)
+
+instance Default Ex where
+  def = MoveTwo
 
 extraToEx :: Extra -> [Ex]
 extraToEx ex = 
@@ -219,6 +223,9 @@ type Size = Int
 
 data Direction = RIGHT | LEFT | UP | DOWN deriving (Eq, Ord, Enum, Show, Bounded)
 
+instance Default Direction where
+  def = RIGHT
+
 right_ :: Lens' Direction Direction 
 right_ = lens (const RIGHT) (\dir s -> s)
 
@@ -254,6 +261,9 @@ executable s p =
 
 data Answer = Yes | No deriving (Eq, Ord, Enum, Show, Bounded)
 
+instance Default Answer where
+  def = Yes
+
 yes_ :: Lens' Answer Answer 
 yes_ = lens (const Yes) (\ans s -> s)
 
@@ -261,6 +271,9 @@ no_ :: Lens' Answer Answer
 no_ = lens (const No) (\ans s -> s)
 
 data RPS = Rock | Paper | Scissors deriving (Eq, Ord, Enum, Show, Bounded)
+
+instance Default RPS where
+  def = Rock
 
 rock_ :: Lens' RPS RPS 
 rock_ = lens (const Rock) (\rps s -> s)
@@ -633,8 +646,8 @@ playerAction = do
       
       action = do
         input <- liftIO getLine
-        let isMoveCommand = lookupFromRegisteredA input LEFT
-            isExCommand = lookupFromRegisteredA input MoveTwo
+        let isMoveCommand = lookupFromRegisteredA input (def :: Direction)
+            isExCommand = lookupFromRegisteredA input (def :: Ex)
         case getLast isMoveCommand of
           (Just d) -> if d `elem` directions
             then doMove d 
@@ -722,7 +735,7 @@ enemyAction = do
           ]
         tell' "--Rock Paper Scissors Stage--"
         input <- liftIO getLine
-        let isRPS = getLast $ lookupFromRegisteredA input Rock
+        let isRPS = getLast $ lookupFromRegisteredA input (def :: RPS)
         case isRPS of
           Just rps -> do
             tell' $ "Player : select " <> show rps 
