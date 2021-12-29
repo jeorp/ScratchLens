@@ -1,5 +1,5 @@
 # ScratchLens
   
   
-Scratch lens and sample program using it
+Scratch lens and sample program
 
