@@ -3,10 +3,10 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE  RankNTypes #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE  AllowAmbiguousTypes #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module Main where
@@ -518,19 +518,19 @@ class Description d where
   descript :: d -> Descriptor d 
 
 instance Description [Answer] where
-  descript = Descriptor "Answer : " 
+  descript = Descriptor "Answer - " 
 
 instance Description [Direction] where
-  descript = Descriptor "Direction : "
+  descript = Descriptor "Direction - "
 
 instance Description [RPS] where
-  descript = Descriptor "Rock Scissors Paper GO!!! : "
+  descript = Descriptor "Rock Scissors Paper GO!!! - "
 
 instance Description [Ex] where
-  descript = Descriptor "Extra : "
+  descript = Descriptor "Extra - "
 
 instance Description Extra where
-  descript = Descriptor "Extra : "
+  descript = Descriptor "Extra - "
 
 printBoard :: Point -> Int -> IO () 
 printBoard p d = undefined
@@ -614,7 +614,7 @@ gameStart = do
       "hello " <> name_ <> "!!", 
       "Ok. Start Game",
       "This game is on " <> show size <> "*" <> show size <> " board.",
-      "Player (you) is (0, 0), Enemy is " <> show (size, size) <> " now.",
+      "Player (you) is (0,0), Enemy is " <> show (size, size) <> " now.",
       "In this situation, you should not meet Enemy on board, if then Bang!!",
       "",
       "",
